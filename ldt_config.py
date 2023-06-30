@@ -3,7 +3,7 @@ config = {
     'img_size': 128,
     'ds_val_seed': 22,
     'fid_batch_size': 50,
-    'n_fid_images': 600,
+    'n_fid_images': 2000,
     'fid_diffusion_steps': 40,
     'ae_dir': 'autoencoder',
     'ae_name': 'model_1',

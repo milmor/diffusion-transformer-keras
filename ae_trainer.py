@@ -65,7 +65,7 @@ class AutoencoderKL():
             fake_logits = self.discriminator(rec_img, training=True)[0]
             real_logits = self.discriminator(train_img, training=True)[0]
             d_loss = self.discriminator_loss(real_logits, fake_logits) * disc_factor
-            g_loss = self.generator_loss(fake_logits)
+            g_loss = self.generator_loss(fake_logits) * disc_factor
 
             rec_loss = self.mae(rec_img, train_img) * self.rec_weight
             ae_total_loss = rec_loss + kl_loss + g_loss
