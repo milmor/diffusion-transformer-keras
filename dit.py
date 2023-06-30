@@ -85,24 +85,25 @@ class SMLayerNormalization(layers.Layer):
 
     def build(self, input_shape):
         self.h = layers.Dense(input_shape[2], use_bias=True, 
-                    kernel_initializer=self.initializer)
+            kernel_initializer=self.initializer
+        )
         self.gamma = layers.Dense(input_shape[2], use_bias=True, 
-                        kernel_initializer=self.initializer, bias_initializer='ones'
-                        )
+            kernel_initializer=self.initializer, bias_initializer='ones'
+        )
         self.beta = layers.Dense(input_shape[2], use_bias=True, 
-                        kernel_initializer=self.initializer)
+            kernel_initializer=self.initializer
+        )
 
     def call(self, inputs, z):
         mean, variance = tf.nn.moments(inputs, axes=2, keepdims=True)
-        
         x = tf.nn.batch_normalization(
                 inputs,
                 mean=mean,
                 variance=variance,
                 offset=None,
                 scale=None,
-                variance_epsilon=self.epsilon)
-        
+                variance_epsilon=self.epsilon
+        )
         h = self.h(z)
         h = tf.nn.silu(h)
         
