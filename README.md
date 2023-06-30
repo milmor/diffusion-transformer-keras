@@ -39,6 +39,8 @@ Implementation notes:
 - LDT largely follows the original DiT model.
 - Modulated layer normalization.
 - Diffusion Transformer with [Linformer](https://arxiv.org/abs/2006.04768) attention.
+- Cosine schedule.
+- [DDIM](https://arxiv.org/abs/2010.02502) sampler.
 - [FID](https://arxiv.org/abs/1706.08500) evaluation.
 - AutoencoderKL with PatchGAN discriminator and hinge loss.
 - This implementation uses code from the [beresandras](https://github.com/beresandras/clear-diffusion-keras/tree/master) repo. Under MIT Licence.
