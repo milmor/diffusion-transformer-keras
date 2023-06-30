@@ -7,21 +7,17 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-class convBlock(tf.keras.models.Model):
-    def __init__(self, filters, kernel_size=3, strides=2, 
-                 initializer='glorot_uniform'):
-        super(convBlock, self).__init__()
-        self.main = tf.keras.Sequential([
+def convBlock(filters, kernel_size=3, initializer='glorot_uniform'):
+    block = tf.keras.Sequential([
             layers.Conv2D(
                 filters, kernel_size=kernel_size, padding='same', 
-                kernel_initializer=initializer, strides=strides, use_bias=False
+                kernel_initializer=initializer, strides=2, 
+                use_bias=False
             ),
             layers.BatchNormalization(),
             layers.LeakyReLU(0.2),
-        ])
-        
-    def call(self, x):
-        return self.main(x)
+    ])
+    return block
     
     
 class Discriminator(tf.keras.models.Model):
@@ -35,13 +31,13 @@ class Discriminator(tf.keras.models.Model):
             ),
             layers.LeakyReLU(0.2),
             convBlock(
-                model_dim[1], kernel_size=3, strides=2, initializer=initializer
+                model_dim[1], kernel_size=3, initializer=initializer
             ),
             convBlock(
-                model_dim[2], kernel_size=3, strides=2, initializer=initializer
+                model_dim[2], kernel_size=3, initializer=initializer
             ),
             convBlock(
-                model_dim[3], kernel_size=3, strides=2, initializer=initializer
+                model_dim[3], kernel_size=3, initializer=initializer
             ),
         ])    
         
