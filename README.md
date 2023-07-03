@@ -27,7 +27,7 @@ python ldt_train.py --file_pattern=./dataset_path/*.png
 ## Sampling
 Use `--model_dir=<model_dir>` and `--ldt_name=<ldt_name>` to specify the pre-trained model. For example:
 ```
-python ldt_train.py --model_dir=ldt --ldt_name=model_1 --diffusion_steps=40
+python sample.py --model_dir=ldt --ldt_name=model_1 --diffusion_steps=40
 ```
 
 
