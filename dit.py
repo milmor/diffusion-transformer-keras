@@ -77,9 +77,9 @@ class PositionalEmbedding(layers.Layer):
         return patches + self.position_embedding(positions)
     
 
-class adaLN(layers.Layer):
+class AdaLN(layers.Layer):
     def __init__(self, epsilon=1e-3, initializer='glorot_uniform'):
-        super(adaLN, self).__init__()
+        super(AdaLN, self).__init__()
         self.epsilon = epsilon
         self.initializer = initializer
         self.norm = layers.LayerNormalization(epsilon=epsilon,    
@@ -133,8 +133,8 @@ class DiTBlock(layers.Layer):
             ), 
             layers.Dense(model_dim, kernel_initializer=initializer),
         ])
-        self.sm1 = adaLN(epsilon=eps, initializer=mod_init)
-        self.sm2 = adaLN(epsilon=eps, initializer=mod_init)
+        self.sm1 = AdaLN(epsilon=eps, initializer=mod_init)
+        self.sm2 = AdaLN(epsilon=eps, initializer=mod_init)
         self.scale1 = Scale(initializer=mod_init)
         self.scale2 = Scale(initializer=mod_init)
 
@@ -157,7 +157,7 @@ class FinalLayer(layers.Layer):
                          kernel_initializer=initializer, 
             ), 
         ])
-        self.sm = adaLN(epsilon=eps, initializer=initializer)
+        self.sm = AdaLN(epsilon=eps, initializer=initializer)
 
     def call(self, inputs, z, training):
         x = self.sm(inputs, z)
