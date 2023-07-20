@@ -76,48 +76,53 @@ class PositionalEmbedding(layers.Layer):
         positions = tf.range(start=0, limit=self.n_patches, delta=1)
         return patches + self.position_embedding(positions)
     
-    
-class SMLayerNormalization(layers.Layer):
+
+class adaLN(layers.Layer):
     def __init__(self, epsilon=1e-3, initializer='glorot_uniform'):
-        super(SMLayerNormalization, self).__init__()
+        super(adaLN, self).__init__()
         self.epsilon = epsilon
         self.initializer = initializer
+        self.norm = layers.LayerNormalization(epsilon=epsilon,    
+            center=False, scale=False
+        )
 
     def build(self, input_shape):
-        self.h = layers.Dense(input_shape[2], use_bias=True, 
-            kernel_initializer=self.initializer
-        )
         self.gamma = layers.Dense(input_shape[2], use_bias=True, 
-            kernel_initializer=self.initializer, bias_initializer='ones'
+            kernel_initializer=self.initializer, 
         )
         self.beta = layers.Dense(input_shape[2], use_bias=True, 
             kernel_initializer=self.initializer
         )
 
     def call(self, inputs, z):
-        mean, variance = tf.nn.moments(inputs, axes=2, keepdims=True)
-        x = tf.nn.batch_normalization(
-                inputs,
-                mean=mean,
-                variance=variance,
-                offset=None,
-                scale=None,
-                variance_epsilon=self.epsilon
-        )
-        h = self.h(z)
-        h = tf.nn.silu(h)
-        
-        scale = self.gamma(h)
-        offset = self.beta(h)
+        x = self.norm(inputs)
+        scale = self.gamma(z)
+        shift = self.beta(z)
 
+        x = x * (1 + tf.expand_dims(scale, 1)) + tf.expand_dims(shift, 1)
+        return x
+    
+    
+class Scale(layers.Layer):
+    def __init__(self, initializer='glorot_uniform'):
+        super(Scale, self).__init__()
+        self.initializer = initializer
+
+    def build(self, input_shape):
+        self.alpha = layers.Dense(input_shape[2], use_bias=True, 
+            kernel_initializer=self.initializer,
+        )
+
+    def call(self, x, z):
+        scale = self.alpha(z)
         x *= tf.expand_dims(scale, 1)
-        x += tf.expand_dims(offset, 1)
         return x
 
 
 class DiTBlock(layers.Layer):
     def __init__(self, model_dim, n_heads=2, mlp_dim=512, rate=0.0,
-                 eps=1e-6, initializer='glorot_uniform', k=64, **kwargs):
+                 eps=1e-6, initializer='glorot_uniform', 
+                 mod_init='glorot_uniform', k=64, **kwargs):
         super(DiTBlock, self).__init__(**kwargs)
         self.attn = LinformerAttention(model_dim, n_heads, k=k, 
                                        initializer=initializer
@@ -128,25 +133,48 @@ class DiTBlock(layers.Layer):
             ), 
             layers.Dense(model_dim, kernel_initializer=initializer),
         ])
-        self.sm1 = SMLayerNormalization(epsilon=eps)
-        self.sm2 = SMLayerNormalization(epsilon=eps)
-        self.drop1 = layers.Dropout(rate)
-        self.drop2 = layers.Dropout(rate)
+        self.sm1 = adaLN(epsilon=eps, initializer=mod_init)
+        self.sm2 = adaLN(epsilon=eps, initializer=mod_init)
+        self.scale1 = Scale(initializer=mod_init)
+        self.scale2 = Scale(initializer=mod_init)
 
     def call(self, inputs, z, training):
         x_norm1 = self.sm1(inputs, z)
-        attn_output = self.attn(x_norm1, x_norm1, x_norm1)
-        attn_output = inputs + self.drop1(attn_output, training=training) 
+        attn_output = self.scale1(self.attn(x_norm1, x_norm1, x_norm1), z)
+        attn_output = inputs + attn_output
         
         x_norm2 = self.sm2(attn_output, z)
-        mlp_output = self.mlp(x_norm2)
-        return self.drop2(mlp_output, training=training) + attn_output 
+        mlp_output = self.scale2(self.mlp(x_norm2), z)
+        return mlp_output + attn_output 
+    
+    
+class FinalLayer(layers.Layer):
+    def __init__(self, patch_size, out_channels,
+                 eps=1e-6, initializer='glorot_uniform', **kwargs):
+        super(FinalLayer, self).__init__(**kwargs)
+        self.linear = tf.keras.Sequential([
+            layers.Dense(patch_size * patch_size * out_channels,
+                         kernel_initializer=initializer, 
+            ), 
+        ])
+        self.sm = adaLN(epsilon=eps, initializer=initializer)
+
+    def call(self, inputs, z, training):
+        x = self.sm(inputs, z)
+        x = self.linear(x)
+        return x
 
 
-class EmbeddingLayer(layers.Layer):
-    def __init__(self, model_dim, **kwargs):
-        super(EmbeddingLayer, self).__init__(**kwargs)
+class TimestepEmbedder(layers.Layer):
+    def __init__(self, model_dim, initializer='glorot_uniform', **kwargs):
+        super(TimestepEmbedder, self).__init__(**kwargs)
         self.model_dim = model_dim
+        self.mlp = tf.keras.Sequential([
+            layers.Dense(model_dim, activation='silu', 
+                         kernel_initializer=initializer
+            ), 
+            layers.Dense(model_dim, kernel_initializer=initializer),
+        ])
         
     def sinusoidal_embedding(self, x):
         embedding_min_frequency = 1.0
@@ -164,12 +192,13 @@ class EmbeddingLayer(layers.Layer):
                 tf.sin(angular_speeds * x),
                 tf.cos(angular_speeds * x),
             ],
-            axis=3,
+            axis=1,
         )
         return embeddings
 
     def call(self, x):
         x = layers.Lambda(self.sinusoidal_embedding)(x)
+        x = self.mlp(x)
         return x
 
 
@@ -183,35 +212,32 @@ class DiT(tf.keras.models.Model):
         self.patches = tf.keras.Sequential([
             layers.Conv2D(model_dim, 
                           kernel_size=patch_size,
-                          strides=patch_size, padding='same'),
-            #layers.LeakyReLU(alpha=0.2)     
+                          strides=patch_size, padding='same'),   
         ])
         
         self.pos = PositionalEmbedding(self.n_patches, model_dim)
-        self.sin_emb = EmbeddingLayer(model_dim)
+        self.sin_emb = TimestepEmbedder(model_dim)
         self.transformer = [DiTBlock(model_dim, 
-                            heads, mlp_dim, k=k) for _ in range(depth)]
-        self.norm = layers.LayerNormalization()
-        self.latent_conv = layers.Conv2D(
-            cuant_dim, 1, strides=1, padding='same', 
-            kernel_initializer="zeros"
+                            heads, mlp_dim, mod_init='zeros', k=k) for _ in range(depth)]
+        self.final_layer = FinalLayer(patch_size, cuant_dim,
+                                     initializer='zeros'
         )
 
     def call(self, x):
         noisy_latent, noise_variances = x
+        B = noise_variances.shape[0]
+        noise_variances = tf.reshape(noise_variances, [B, -1])
         t = self.sin_emb(noise_variances)
         x = self.patches(noisy_latent)
 
         B, H, W, C = x.shape
-        t = tf.reshape(t, [B, -1])
         x = tf.reshape(x, [B, H * W, C])
 
         x = self.pos(x)
         for i in range(self.depth):
             x = self.transformer[i](x, t)
             
-        x = self.norm(x) 
+        x = self.final_layer(x, t)
         x = tf.reshape(x, [B, H, W, -1]) 
         x = tf.nn.depth_to_space(x, self.patch_size, data_format='NHWC') 
-        x = self.latent_conv(x)
         return x
