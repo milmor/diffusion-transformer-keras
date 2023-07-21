@@ -22,7 +22,7 @@ Use `--file_pattern=<file_pattern>` to specify the dataset path and file pattern
 ```
 python ldt_train.py --file_pattern=./dataset_path/*.png
 ```
-Training DiT requires the pretrained AutoencoderKL. Use `ae_dir` and `ae_name` to specify the AutoencoderKL path in the `ldt_config.py` file.
+*Training DiT requires the pretrained AutoencoderKL. Use `ae_dir` and `ae_name` to specify the AutoencoderKL path in the `ldt_config.py` file.
 
 ## Sampling
 Use `--model_dir=<model_dir>` and `--ldt_name=<ldt_name>` to specify the pre-trained model. For example:
@@ -43,6 +43,12 @@ Implementation notes:
 - [FID](https://arxiv.org/abs/1706.08500) evaluation.
 - AutoencoderKL with PatchGAN discriminator and hinge loss.
 - This implementation uses code from the [beresandras](https://github.com/beresandras/clear-diffusion-keras/tree/master) repo. Under MIT Licence.
+
+
+## Samples
+Curated samples from FFHQ
+
+<img src="./images/output.gif" width="550px"></img>
 
 ## Licence
 MIT
