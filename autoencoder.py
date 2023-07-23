@@ -19,14 +19,14 @@ def downBlock(filters, kernel_size=3, initializer='glorot_uniform'):
                 filters, kernel_size=kernel_size, strides=2, 
                 padding='same', use_bias=False, kernel_initializer=initializer
             ),
-            layers.BatchNormalization(),
-            layers.LeakyReLU(0.2),
+            layers.GroupNormalization(),
+            layers.Activation('swish'),
             layers.Conv2D(
                 filters, kernel_size=kernel_size, strides=1, 
                 padding='same', use_bias=False, kernel_initializer=initializer
             ),
-            layers.BatchNormalization(),
-            layers.LeakyReLU(0.2),
+            layers.GroupNormalization(),
+            layers.Activation('swish'),
     ])
     return block
 
@@ -68,14 +68,14 @@ def upBlock(filters, kernel_size=3, initializer='glorot_uniform'):
                 filters, kernel_size=kernel_size, 
                 padding='same', use_bias=False, kernel_initializer=initializer
             ),
-            layers.BatchNormalization(),
-            layers.LeakyReLU(0.2),
+            layers.GroupNormalization(),
+            layers.Activation('swish'),
             layers.Conv2D(
                 filters, kernel_size=kernel_size, 
                 padding='same', use_bias=False, kernel_initializer=initializer
             ),
-            layers.BatchNormalization(),
-            layers.LeakyReLU(0.2),
+            layers.GroupNormalization(),
+            layers.Activation('swish'),
     ])
     return block
                  

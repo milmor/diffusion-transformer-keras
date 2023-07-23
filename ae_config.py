@@ -7,8 +7,8 @@ config = {
     'd_lr': 0.0001,
     'd_dim': [16, 32, 64, 128, 256],
     'kl_weight': 0.000001,
-    'rec_weight': 1.0,
-    'adv_weight': 2.0,
+    'rec_weight': 10.0, # mae: 10.0
+    'adv_weight': 0.5, # mae: 0.5
     'encoder_dim': [128, 256],
     'decoder_dim': [256, 128],
     'd_start': 50000, # start training the discriminator after N samples
