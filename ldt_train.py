@@ -25,7 +25,7 @@ def train(args):
     max_ckpt_to_keep = args.max_ckpt_to_keep
     interval = args.interval
     restore_best = args.restore_best
-    total_images = args.total_images
+    total_batches = args.total_batches
     
     # ldt config file
     model_dir = os.path.join(model_dir, ldt_name)
@@ -58,7 +58,8 @@ def train(args):
         file_pattern,  config['fid_batch_size'], config['img_size'], 
         config['n_fid_images'], config['ds_val_seed'], 
     )
-    train_batch = next(iter(train_ds))
+    train_ds = iter(train_ds.repeat())
+    train_batch = next(train_ds)
     
     # ae model
     autoencoder = Autoencoder(
@@ -77,7 +78,7 @@ def train(args):
     ae_kl.restore_ae(ae_dir)
     test_latent = ae_kl.ae.encoder(train_batch)[0]
     
-    # ldt model
+    # dit model
     dit = DiT(
         config['latent_size'], config['patch_size'], config['ldt_dim'], 
         heads=config['heads'], k=config['k'], mlp_dim=config['mlp_dim'], 
@@ -98,6 +99,8 @@ def train(args):
     opt = tf.keras.optimizers.Adam(
             learning_rate=config['learning_rate']
     )
+
+    # trainer
     ldt = LDT(
         network=dit, ae_kl=ae_kl, opt=opt, diffusion_schedule=diffusion_schedule,
         config=config
@@ -108,19 +111,24 @@ def train(args):
     ldt.plot_images(0, diffusion_steps=config['fid_diffusion_steps']) # init ldt
     
     # train
+    start_batch = int((ldt.ckpt.n_images / ldt.batch_size) + 1)
     n_images = int(ldt.ckpt.n_images)
-    for _ in range(total_images):
-        start = time.time()
-        for batch in train_ds.take(interval):
-            ldt.train_step(batch)
-        n_images += interval * ldt.batch_size
-        print(f'\nTime for interval is {time.time()-start:.4f} sec')
-        ldt.save_ckpt(
-            n_images, config['n_fid_images'], config['fid_diffusion_steps'],
-            config['fid_batch_size'], val_ds
-        )
-        ldt.plot_images(n_images, diffusion_steps=config['fid_diffusion_steps'])
-    
+    start = time.time()
+
+    for n_batch in range(start_batch, total_batches):
+        batch = train_ds.get_next()
+        ldt.train_step(batch)
+
+        if n_batch % interval == 0:
+            print(f'\nTime for interval is {time.time()-start:.4f} sec')
+            start = time.time()
+            n_images = n_batch * ldt.batch_size
+            ldt.save_ckpt(
+                n_images, config['n_fid_images'], config['fid_diffusion_steps'],
+                config['fid_batch_size'], val_ds
+            )
+            ldt.plot_images(n_images, diffusion_steps=config['fid_diffusion_steps'])
+
         
 def main():
     parser = argparse.ArgumentParser()
@@ -129,8 +137,8 @@ def main():
     parser.add_argument('--ldt_name', type=str, default='model_1')
     parser.add_argument('--max_ckpt_to_keep', type=int, default=2)
     parser.add_argument('--interval', type=int, default=500)
-    parser.add_argument('--restore_best', type=bool, default=True)    
-    parser.add_argument('--total_images', type=int, default=100000000)  
+    parser.add_argument('--restore_best', type=bool, default=False)    
+    parser.add_argument('--total_batches', type=int, default=100000000)  
     args = parser.parse_args()
 
     train(args)
