@@ -70,6 +70,7 @@ def train(args):
     ae_opt = tf.keras.optimizers.Adam(learning_rate=config['ae_lr'])
     d_opt = tf.keras.optimizers.Adam(learning_rate=config['d_lr'])
     
+    # trainer
     ae_kl = AutoencoderKL(
         get_augmenter(image_size=config['img_size']), autoencoder, 
         discriminator, ae_opt, d_opt, config
