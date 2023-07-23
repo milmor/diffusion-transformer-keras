@@ -108,7 +108,7 @@ def main():
     parser.add_argument('--ae_name', type=str, default='model_1')
     parser.add_argument('--max_ckpt_to_keep', type=int, default=2)
     parser.add_argument('--interval', type=int, default=100)
-    parser.add_argument('--restore_best', type=bool, default=True)    
+    parser.add_argument('--restore_best', type=bool, default=False)    
     parser.add_argument('--total_batches', type=int, default=100000000)  
     args = parser.parse_args()
 
