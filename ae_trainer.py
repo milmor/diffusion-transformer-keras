@@ -16,15 +16,18 @@ class AutoencoderKL():
         self.discriminator = discriminator
         self.ae_opt = ae_opt
         self.d_opt = d_opt
+        self.batch_size = config['batch_size']
         self.rec_weight = config['rec_weight']
+        self.adv_weight = config['adv_weight']
         self.kl_weight = config['kl_weight']
         self.d_start = config['d_start']
         self.n_images = tf.Variable(0, dtype=tf.int64)
         # metrics
         self.train_metrics = {}
+        self.test_metrics = {}
         self._build_metrics()
         # loss
-        self.mae = tf.keras.losses.MeanAbsoluteError()
+        self.loss = tf.keras.losses.MeanAbsoluteError()
         
     def _build_metrics(self):
         metric_names = [
@@ -37,6 +40,7 @@ class AutoencoderKL():
 
         for metric_name in metric_names:
             self.train_metrics[metric_name] = tf.keras.metrics.Mean()
+            self.test_metrics[metric_name] = tf.keras.metrics.Mean()
         
     def denormalize(self, images):
         # convert the pixel values back to 0-1 range
@@ -51,23 +55,23 @@ class AutoencoderKL():
         return -tf.reduce_mean(fake_img)
     
     @tf.function
-    def train_step(self, train_img):
-        train_img = self.augmenter(train_img, training=True)
+    def train_step(self, real_img):
+        real_img = self.augmenter(real_img, training=True)
         disc_factor = 0.0
         if self.n_images > self.d_start:
             disc_factor = 1.0
         with tf.GradientTape() as ae_tape, tf.GradientTape() as disc_tape:
 
-            rec_img, z_mean, z_log_var = self.ae(train_img, training=True)
+            rec_img, z_mean, z_log_var = self.ae(real_img, training=True)
             kl_loss = (-0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))) 
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=[1, 2, 3])) * self.kl_weight
 
             fake_logits = self.discriminator(rec_img, training=True)[0]
-            real_logits = self.discriminator(train_img, training=True)[0]
+            real_logits = self.discriminator(real_img, training=True)[0]
             d_loss = self.discriminator_loss(real_logits, fake_logits) * disc_factor
-            g_loss = self.generator_loss(fake_logits) * disc_factor
+            g_loss = self.generator_loss(fake_logits) * self.adv_weight * disc_factor
 
-            rec_loss = self.mae(rec_img, train_img) * self.rec_weight
+            rec_loss = self.loss(rec_img, real_img) * self.rec_weight 
             ae_total_loss = rec_loss + kl_loss + g_loss
 
         ae_grad = ae_tape.gradient(ae_total_loss, self.ae.trainable_weights)
@@ -78,6 +82,33 @@ class AutoencoderKL():
         
         update_metrics(
          self.train_metrics,
+         rec_loss=rec_loss,
+         kl_loss=kl_loss,
+         d_loss=d_loss,
+         ae_total_loss=ae_total_loss,
+         g_loss=g_loss, 
+      )
+        
+    @tf.function
+    def test_step(self, real_img):
+        disc_factor = 0.0
+        if self.n_images > self.d_start:
+            disc_factor = 1.0
+
+        rec_img, z_mean, z_log_var = self.ae(real_img, training=False)
+        kl_loss = (-0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))) 
+        kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=[1, 2, 3])) * self.kl_weight
+
+        fake_logits = self.discriminator(rec_img, training=False)[0]
+        real_logits = self.discriminator(real_img, training=False)[0]
+        d_loss = self.discriminator_loss(real_logits, fake_logits) * disc_factor
+        g_loss = self.generator_loss(fake_logits) * self.adv_weight * disc_factor
+
+        rec_loss = self.loss(rec_img, real_img) * self.rec_weight 
+        ae_total_loss = rec_loss + kl_loss + g_loss
+        
+        update_metrics(
+         self.test_metrics,
          rec_loss=rec_loss,
          kl_loss=kl_loss,
          d_loss=d_loss,
@@ -154,14 +185,20 @@ class AutoencoderKL():
     def save_ckpt(self, n_images, verbose=1, reset_states=True):
         # tensorboard
         with self.writer.as_default():
+            print('Train metrics: ')
             for name, metric in self.train_metrics.items():
-                print(f'{name}: {metric.result():.4f} -', end=" ")
-                tf.summary.scalar(name, metric.result(), step=n_images)
+                print(f'train_{name}: {metric.result():.4f}', end=" - ")
+                tf.summary.scalar(f'train_{name}', metric.result(), step=n_images)
+            print('\nVal metrics: ')
+            for name, metric in self.test_metrics.items():
+                print(f'val_{name}: {metric.result():.4f}', end=" - ")
+                tf.summary.scalar(f'val_{name}', metric.result(), step=n_images)
         print(f'n_images: {n_images}') 
         self.n_images.assign(n_images)
         # checkpoint
-        if self.train_metrics['rec_loss'].result() < self.ckpt.best_loss:  
-            self.ckpt.best_loss.assign(self.train_metrics['rec_loss'].result())
+        if self.test_metrics['rec_loss'].result() < self.ckpt.best_loss:  
+            self.ckpt.best_loss.assign(self.test_metrics['rec_loss'].result())
+            self.ckpt_manager.save(n_images)
             self.best_ckpt_manager.save(n_images)
             print(f'Best checkpoint saved at {n_images} images')
         else:
@@ -170,6 +207,7 @@ class AutoencoderKL():
         
         # reset metrics    
         reset_metrics(self.train_metrics)
+        reset_metrics(self.test_metrics)
 
     def restore_ae(self, model_dir, max_ckpt_to_keep=1):
         best_checkpoint_dir = os.path.join(model_dir, 'ae-best-ckpt')

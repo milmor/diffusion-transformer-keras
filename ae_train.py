@@ -17,13 +17,14 @@ def train(args):
     print('\n###################')
     print('AutoencoderKL Train')
     print('###################\n')
-    file_pattern = args.file_pattern
+    train_file_pattern = args.train_file_pattern
+    test_file_pattern = args.test_file_pattern
     model_dir = args.model_dir
     ae_name = args.ae_name
     max_ckpt_to_keep = args.max_ckpt_to_keep
     interval = args.interval
     restore_best = args.restore_best
-    total_images = args.total_images
+    total_batches = args.total_batches
     
     # config file
     model_dir = os.path.join(model_dir, ae_name)
@@ -42,21 +43,27 @@ def train(args):
     print(config)
     
     # dataset
-    train_ds = create_train_ds(
-        file_pattern, config['batch_size'], config['img_size']
-    )
-    train_batch = next(iter(train_ds))
+    train_ds = create_train_ds(train_file_pattern, 
+                        config['batch_size'], 
+                        config['img_size'])
+
+    test_ds = create_train_ds(test_file_pattern, 
+                        config['batch_size'], 
+                        config['img_size'])
+
+    train_ds = iter(train_ds.repeat())
+    test_batch = next(iter(test_ds))
     
     # model
     autoencoder = Autoencoder(
         config['encoder_dim'], config['decoder_dim'],
         cuant_dim=config['cuant_dim']
     )
-    autoencoder(train_batch) # init model
+    autoencoder(test_batch) # init model
     print(autoencoder.summary())
 
     discriminator = Discriminator(config['d_dim'])
-    discriminator(train_batch) # init model
+    discriminator(test_batch) # init model
     print(discriminator.summary())
     
     # optimizers
@@ -68,28 +75,41 @@ def train(args):
         discriminator, ae_opt, d_opt, config
     )
     ae_kl.create_ckpt(model_dir, max_ckpt_to_keep, restore_best)
+
+    ae_kl.plot_images(test_batch, 0) # init model
     
     # train
+    start_batch = int((ae_kl.ckpt.n_images / ae_kl.batch_size) + 1)
     n_images = int(ae_kl.ckpt.n_images)
-    for _ in range(total_images):
-        start = time.time()
-        for batch in train_ds.take(interval):
-            ae_kl.train_step(batch)
-        n_images += interval * config['batch_size']
-        print(f'\nTime for interval is {time.time()-start:.4f} sec')
-        ae_kl.plot_images(train_batch, n_images)
-        ae_kl.save_ckpt(n_images)
+    start = time.time()
+
+    for n_batch in range(start_batch, total_batches):
+        batch = train_ds.get_next()
+        ae_kl.train_step(batch)
+        
+        if n_batch % interval == 0:
+            print(f'\nTime for interval is {time.time()-start:.4f} sec')
+            start = time.time()
+            # val loop
+            for batch in test_ds:
+                ae_kl.test_step(batch)
+            print(f'Time for val is {time.time()-start:.4f} sec')
+            
+            n_images = n_batch * ae_kl.batch_size
+            ae_kl.plot_images(test_batch, n_images)
+            ae_kl.save_ckpt(n_images)
 
         
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file_pattern', type=str)
+    parser.add_argument('--train_file_pattern', type=str)
+    parser.add_argument('--test_file_pattern', type=str)
     parser.add_argument('--model_dir', type=str, default='autoencoder')
     parser.add_argument('--ae_name', type=str, default='model_1')
     parser.add_argument('--max_ckpt_to_keep', type=int, default=2)
     parser.add_argument('--interval', type=int, default=100)
     parser.add_argument('--restore_best', type=bool, default=True)    
-    parser.add_argument('--total_images', type=int, default=100000000)  
+    parser.add_argument('--total_batches', type=int, default=100000000)  
     args = parser.parse_args()
 
     train(args)
