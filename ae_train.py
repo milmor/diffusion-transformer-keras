@@ -75,8 +75,6 @@ def train(args):
         discriminator, ae_opt, d_opt, config
     )
     ae_kl.create_ckpt(model_dir, max_ckpt_to_keep, restore_best)
-
-    ae_kl.plot_images(test_batch, 0) # init model
     
     # train
     start_batch = int((ae_kl.ckpt.n_images / ae_kl.batch_size) + 1)
