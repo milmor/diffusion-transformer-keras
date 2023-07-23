@@ -278,7 +278,7 @@ class LDT():
         # tensorboard
         with self.writer.as_default():
             for name, metric in self.train_metrics.items():
-                print(f'{name}: {metric.result():.4f} -', end=" ")
+                print(f'{name}: {metric.result():.4f}', end=" - ")
                 tf.summary.scalar(name, metric.result(), step=n_images)
         
         # fid
@@ -293,6 +293,7 @@ class LDT():
         
         if fid < self.ckpt.best_fid:
             self.ckpt.best_fid.assign(fid)
+            self.ckpt_manager.save(n_images)
             self.best_ckpt_manager.save(n_images)
             print(f'FID improved. Best checkpoint saved at {n_images} images') 
         else:
