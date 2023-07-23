@@ -12,15 +12,15 @@ See [here](https://github.com/facebookresearch/DiT) for the official Pytorch imp
 - Tensorfow 2.12
 
 ## Training AutoencoderKL
-Use `--file_pattern=<file_pattern>` to specify the dataset path and file pattern.
+Use `--train_file_pattern=<file_pattern>` and `--test_file_pattern=<file_pattern>` to specify the train and test dataset path.
 ```
-python ae_train.py --file_pattern=./dataset_path/*.png
+python ae_train.py --train_file_pattern='./train_dataset_path/*.png' --test_file_pattern='./test_dataset_path/*.png' 
 ```
 
 ## Training Diffusion Transformer
 Use `--file_pattern=<file_pattern>` to specify the dataset path and file pattern.
 ```
-python ldt_train.py --file_pattern=./dataset_path/*.png
+python ldt_train.py --file_pattern='./dataset_path/*.png'
 ```
 *Training DiT requires the pretrained AutoencoderKL. Use `ae_dir` and `ae_name` to specify the AutoencoderKL path in the `ldt_config.py` file.
 
