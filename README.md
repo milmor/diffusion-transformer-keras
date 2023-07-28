@@ -48,7 +48,7 @@ Implementation notes:
 ## Samples
 Curated samples from FFHQ
 
-<img src="./images/output.gif" width="550px"></img>
+<img src="./images/generate_200.gif" width="600px"></img>
 
 ## Licence
 MIT
