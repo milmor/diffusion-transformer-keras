@@ -18,7 +18,7 @@ python ae_train.py --train_file_pattern='./train_dataset_path/*.png' --test_file
 ```
 
 ## Training Diffusion Transformer
-Use `--file_pattern=<file_pattern>` to specify the dataset path and file pattern.
+Use `--file_pattern=<file_pattern>` to specify the dataset path.
 ```
 python ldt_train.py --file_pattern='./dataset_path/*.png'
 ```
