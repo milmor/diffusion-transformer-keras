@@ -36,7 +36,7 @@ Adjust hyperparameters in the `ae_config.py` and `ldt_config.py` files.
 Implementation notes:
 - LDT is designed to offer reasonable performance using a single GPU (RTX 3080 TI).
 - LDT largely follows the original DiT model.
-- Modulated layer normalization.
+- DiT Block with adaLN-Zero.
 - Diffusion Transformer with [Linformer](https://arxiv.org/abs/2006.04768) attention.
 - Cosine schedule.
 - [DDIM](https://arxiv.org/abs/2010.02502) sampler.
