@@ -121,13 +121,13 @@ def train(args):
 
         if n_batch % interval == 0:
             print(f'\nTime for interval is {time.time()-start:.4f} sec')
-            start = time.time()
             n_images = n_batch * ldt.batch_size
             ldt.save_ckpt(
                 n_images, config['n_fid_images'], config['fid_diffusion_steps'],
                 config['fid_batch_size'], val_ds
             )
             ldt.plot_images(n_images, diffusion_steps=config['fid_diffusion_steps'])
+            start = time.time()
 
         
 def main():
