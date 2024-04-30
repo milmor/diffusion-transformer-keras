@@ -9,7 +9,7 @@ See [here](https://github.com/facebookresearch/DiT) for the official Pytorch imp
 
 ## Dependencies
 - Python 3.8
-- Tensorfow 2.12
+- TensorFlow 2.12
 
 ## Training AutoencoderKL
 Use `--train_file_pattern=<file_pattern>` and `--test_file_pattern=<file_pattern>` to specify the train and test dataset path.
